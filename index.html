@@ -1,0 +1,187 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="https://glitch.com/favicon.ico" />
+    <title>Creating with Data!</title>
+    <link rel="stylesheet" href="/style.css" />
+
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css"
+      integrity="sha512-hoalWLoI8r4UszCkZ5kL8vayOGVae1oxXe/2A4AO6J9+580uKHDO3JdHb7NzwwzK5xr/Fs0W40kiNHxM9vyTtQ=="
+      crossorigin=""
+    />
+
+    <style></style>
+
+    <script
+      src="https://unpkg.com/leaflet@1.8.0/dist/leaflet.js"
+      integrity="sha512-BB3hKbKWOc9Ez/TAwyWxNXeoV9c1v6FIeYiBieIWkpLjauysF18NzgR1MBNBXf8/KABdlkX68nAhlwcDFLGPCQ=="
+      crossorigin=""
+    ></script>
+  </head>
+  <body>
+    <main class="wrapper">
+      <div class="content">
+        <h1>Text Filtering + Leaflet JS</h1>
+        <p></p>
+
+        <select id="simd-filter">
+          <option value="">All</option>
+          <option value="1">SIMD 1</option>
+          <option value="2">SIMD 2</option>
+          <option value="3">SIMD 3</option>
+          <option value="4">SIMD 4</option>
+          <option value="5">SIMD 5</option>
+          <option value="6">SIMD 6</option>
+          <option value="7">SIMD 7</option>
+          <option value="8">SIMD 8</option>
+          <option value="9">SIMD 9</option>
+          <option value="10">SIMD 10</option>
+        </select>
+
+        <input
+          id="presc-filter"
+          type="number"
+          placeholder="Prescriptions filter"
+        />
+        
+       <input style="margin-top: 1rem;"
+          id="name-filter"
+          type="text"
+          placeholder="Practice name filter"
+        />
+        
+        <div
+          style="margin-top: 1rem; height: 400px; width: 400px"
+          id="map"
+        ></div>
+
+        <div style="width: 50%; min-width: 350px">
+          <p class="mb3">
+            The data in this example is
+            <a href="https://en.wikipedia.org/wiki/Synthetic_data">synthetic</a>
+            (i.e. not real, but resembling real data). This was based on a
+            dataset of GPs in Scotland and avg. speciality prescriptions per
+            patient.</p> <p>Thanks to
+            <a href="https://www.opendata.nhs.scot/">Public Health Scotland</a>
+            and data-journalist,
+            <a href="https://www.linkedin.co.uk/in/petra-matijevic/"
+              >Petra Matijevic</a
+            >
+            for providing the original.
+          </p>
+        </div>
+      </div>
+    </main>
+
+    <script type="module">
+      import { csv } from "https://cdn.skypack.dev/d3-fetch@3";
+
+      // RENDERING METHOD
+      const renderCircles = function (data) {
+        circleGroup.clearLayers();
+
+        for (const d of data) {
+          var circle = L.circle([d.lat, d.long], {
+            color: colours[d.simd_deprivation_group - 1],
+            weight: 2,
+            fillColor: colours[d.simd_deprivation_group - 1],
+            fillOpacity: 0.5,
+          });
+
+          circle.bindTooltip(d.prescription);
+
+          circleGroup.addLayer(circle);
+        }
+        
+        const latitudes = data.map((r)=> r.lat);
+        const longitudes = data.map((r)=> r.long);
+
+        const minLng = Math.min(...longitudes);
+        const minLat = Math.min(...latitudes);
+        
+        const maxLng = Math.max(...longitudes);
+        const maxLat = Math.max(...latitudes);
+
+        window.themap.flyToBounds([[maxLat,maxLng], [minLat, minLng]]);
+      };
+
+      // FILTERING LOGIC
+      const filterData = function () {
+        let simdFilteredData = [];
+        let simdValue = document.getElementById("simd-filter").value;
+
+        if (simdValue === "") {
+          simdFilteredData = window.data;
+        }
+        for (const d of window.data) {
+          if (d.simd_deprivation_group === simdValue) {
+            simdFilteredData.push(d);
+          }
+        }
+
+        let prescData = [];
+        let prescValue = document.getElementById("presc-filter").value;
+
+        if (prescValue === "") {
+          prescData = simdFilteredData;
+        }
+        for (const d of simdFilteredData) {
+          if (parseFloat(d.prescriptions) <= parseFloat(prescValue)) {
+            prescData.push(d);
+          }
+        }
+        
+        let filteredData = [];
+        let nameValue = document.getElementById("name-filter").value;
+
+        if (nameValue === "") {
+          filteredData = prescData;
+        } else {
+          for (const d of prescData) {
+            if (d.practice_name.includes(nameValue)) {
+              filteredData.push(d);
+            }
+          }
+        }
+
+        renderCircles(filteredData);
+      };
+
+      // ONE OFF
+      var map = L.map("map").setView([55.948997, -3.184296], 6);
+      window.themap = map;
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "© OpenStreetMap",
+      }).addTo(map);
+
+      const colours = [
+        "#acfa70",
+        "#292f56",
+      ];
+
+      let circleGroup = L.layerGroup([]).addTo(map);
+
+      document
+        .getElementById("simd-filter")
+        .addEventListener("change", filterData);
+      document
+        .getElementById("presc-filter")
+        .addEventListener("change", filterData);
+      document
+        .getElementById("name-filter")
+        .addEventListener("change", filterData);
+      
+      csv("gp_practices.csv").then((data) => {
+        console.log(data);
+        window.data = data;
+        renderCircles(data);
+      });
+    </script>
+  </body>
+</html>
